@@ -17,7 +17,7 @@
 
 #include <cstdint>
 #include <vector>
-
+#include "string"
 namespace ZXing {
 
 /**
@@ -30,5 +30,12 @@ public:
 	ByteArray(std::initializer_list<uint8_t> list) : std::vector<uint8_t>(list) {}
 	explicit ByteArray(int len) : std::vector<uint8_t>(len, 0) {}
 };
+inline std::string ToHex(const ByteArray& bytes) {
+    std::string res(bytes.size() * 3, ' ');
 
+    for (size_t i = 0; i < bytes.size(); ++i)
+        sprintf(&res[i * 3], "%02X ", bytes[i]);
+
+    return res.substr(0, res.size() - 1);
+}
 } // ZXing
