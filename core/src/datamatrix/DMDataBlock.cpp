@@ -60,7 +60,9 @@ std::vector<DataBlock> GetDataBlocks(const ByteArray& rawCodewords, const Versio
 	int max = Size(result[0].codewords);
 	for (int i = longerBlocksNumDataCodewords; i < max; i++) {
 		for (int j = 0; j < numResultBlocks; j++) {
-			int jOffset = specialVersion ? (j + 8) % numResultBlocks : j;
+			// Undoing this change because the generated DMs cannot be read
+			// int jOffset = specialVersion ? (j + 8) % numResultBlocks : j;
+			int jOffset = j;
 			int iOffset = specialVersion && jOffset > 7 ? i - 1 : i;
 			result[jOffset].codewords[iOffset] = rawCodewords[rawCodewordsOffset++];
 		}
