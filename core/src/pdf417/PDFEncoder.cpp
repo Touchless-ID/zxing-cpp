@@ -21,6 +21,7 @@
 #include <array>
 #include <vector>
 #include <stdexcept>
+#include <cmath>
 
 namespace ZXing {
 namespace Pdf417 {
@@ -478,7 +479,7 @@ static void DetermineDimensions(int minCols, int maxCols, int minRows, int maxRo
 		float newRatio = ((17 * cols + 69) / rows) * MODULE_RATIO;
 
 		// ignore if previous ratio is closer to preferred ratio
-		if (haveDimension && std::abs(newRatio - PREFERRED_RATIO) > std::abs(ratio - PREFERRED_RATIO)) {
+		if (haveDimension && std::fabs(newRatio - PREFERRED_RATIO) > std::fabs(ratio - PREFERRED_RATIO)) {
 			continue;
 		}
 
