@@ -44,7 +44,7 @@ constexpr auto PATTERN    = FixedPattern<5, 7>{1, 1, 3, 1, 1};
 constexpr int MIN_MODULES = 1 * 4 + 17; // version 1
 constexpr int MAX_MODULES = 40 * 4 + 17; // version 40
 
-static auto FindFinderPatterns(const BitMatrix& image, bool tryHarder)
+std::vector<ConcentricPattern> FindFinderPatterns(const BitMatrix& image, bool tryHarder)
 {
 	constexpr int MIN_SKIP         = 3;           // 1 pixel/module times 3 modules/center
 	constexpr int MAX_MODULES_FAST = 20 * 4 + 17; // support up to version 20 for mobile clients

@@ -27,20 +27,6 @@
 
 namespace ZXing {
 
-class LumImage : public ImageView
-{
-	std::unique_ptr<uint8_t[]> _memory;
-	LumImage(std::unique_ptr<uint8_t[]>&& data, int w, int h)
-		: ImageView(data.get(), w, h, ImageFormat::Lum), _memory(std::move(data))
-	{}
-
-public:
-	LumImage() : ImageView(nullptr, 0, 0, ImageFormat::Lum) {}
-	LumImage(int w, int h) : LumImage(std::make_unique<uint8_t[]>(w * h), w, h) {}
-
-	uint8_t* data() { return _memory.get(); }
-};
-
 template<typename P>
 static LumImage ExtractLum(const ImageView& iv, P projection)
 {
@@ -125,6 +111,14 @@ std::unique_ptr<BinaryBitmap> CreateBitmap(ZXing::Binarizer binarizer, const Ima
 	case Binarizer::LocalAverage: return std::make_unique<HybridBinarizer>(iv);
 	}
 	return {}; // silence gcc warning
+}
+
+std::pair<std::unique_ptr<BinaryBitmap>, std::unique_ptr<LumImage>>
+GetBinarizedBitmap(const ImageView& _iv, const DecodeHints& hints)
+{
+	std::unique_ptr<LumImage> lum (new LumImage);
+	ImageView iv = SetupLumImageView(_iv, *lum, hints);
+	return std::make_pair(std::move(CreateBitmap(hints.binarizer(), iv)), std::move(lum));
 }
 
 Result ReadBarcode(const ImageView& _iv, const DecodeHints& hints)

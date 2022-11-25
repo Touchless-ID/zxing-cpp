@@ -39,6 +39,9 @@ public:
 
 	Results decode(const BinaryBitmap& image, int maxSymbols) const override;
 
+	Keypoints getKeypoints(const BinaryBitmap& image) const;
+
+
 private:
 	bool _tryHarder, _isPure;
 	std::string _charset;

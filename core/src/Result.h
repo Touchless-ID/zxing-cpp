@@ -165,4 +165,6 @@ private:
 
 using Results = std::vector<Result>;
 
+using Keypoints = std::vector<PointI>;
+
 } // ZXing

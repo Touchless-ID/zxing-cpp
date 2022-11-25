@@ -19,7 +19,25 @@
 #include "ImageView.h"
 #include "Result.h"
 
+#include <memory>
+
 namespace ZXing {
+
+class BinaryBitmap;
+
+class LumImage : public ImageView
+{
+	std::unique_ptr<uint8_t[]> _memory;
+	LumImage(std::unique_ptr<uint8_t[]>&& data, int w, int h)
+		: ImageView(data.get(), w, h, ImageFormat::Lum), _memory(std::move(data))
+	{}
+
+public:
+	LumImage() : ImageView(nullptr, 0, 0, ImageFormat::Lum) {}
+	LumImage(int w, int h) : LumImage(std::make_unique<uint8_t[]>(w * h), w, h) {}
+
+	uint8_t* data() { return _memory.get(); }
+};
 
 /**
  * Read barcode from an ImageView
@@ -32,6 +50,9 @@ Result ReadBarcode(const ImageView& buffer, const DecodeHints& hints = {});
 
 // WARNING: this API is experimental and may change/disappear
 Results ReadBarcodes(const ImageView& buffer, const DecodeHints& hints = {});
+
+std::pair<std::unique_ptr<BinaryBitmap>, std::unique_ptr<LumImage>>
+GetBinarizedBitmap(const ImageView& buffer, const DecodeHints& hints);
 
 } // ZXing
 

@@ -60,7 +60,8 @@ Reader::decode(const BinaryBitmap& image) const
 	return Result(std::move(decoderResult), std::move(position), BarcodeFormat::QRCode);
 }
 
-Results Reader::decode(const BinaryBitmap& image, int maxSymbols) const
+Results
+Reader::decode(const BinaryBitmap& image, int maxSymbols) const
 {
 	auto binImg = image.getBitMatrix();
 	if (binImg == nullptr)
@@ -94,6 +95,28 @@ Results Reader::decode(const BinaryBitmap& image, int maxSymbols) const
 	}
 
 	return results;
+}
+
+Keypoints
+Reader::getKeypoints(const BinaryBitmap& image) const
+{
+	auto binImg = image.getBitMatrix();
+	if (binImg == nullptr)
+		return {};
+
+#ifdef PRINT_DEBUG
+	LogMatrixWriter lmw(log, *binImg, 5, "qr-log.pnm");
+#endif
+
+	auto patterns = FindFinderPatterns(*binImg, _tryHarder);
+	Keypoints kp;
+	kp.reserve(patterns.size());
+	for (const auto p : patterns)
+	{
+		kp.push_back(PointI(p));
+	}
+
+	return kp;
 }
 
 } // namespace ZXing::QRCode

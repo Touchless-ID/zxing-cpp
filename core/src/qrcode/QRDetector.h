@@ -35,6 +35,7 @@ struct FinderPatternSet
 
 using FinderPatternSets = std::vector<FinderPatternSet>;
 
+std::vector<ConcentricPattern> FindFinderPatterns(const BitMatrix& image, bool tryHarder);
 FinderPatternSets FindFinderPatternSets(const BitMatrix& image, bool tryHarder);
 DetectorResult SampleAtFinderPatternSet(const BitMatrix& image, const FinderPatternSet& fp);
 
