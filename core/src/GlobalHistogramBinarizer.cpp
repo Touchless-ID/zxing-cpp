@@ -135,7 +135,7 @@ bool GlobalHistogramBinarizer::getPatternRow(int row, int rotation, PatternRow& 
 
 // Does not sharpen the data, as this call is intended to only be used by 2D Readers.
 std::shared_ptr<const BitMatrix>
-GlobalHistogramBinarizer::getBlackMatrix() const
+GlobalHistogramBinarizer::getBlackMatrix(float &blur_score) const
 {
 	// Quickly calculates the histogram by sampling four rows from the image. This proved to be
 	// more robust on the blackbox tests than sampling a diagonal as we used to do.
@@ -150,9 +150,20 @@ GlobalHistogramBinarizer::getBlackMatrix() const
 		}
 	}
 
+    blur_score = 0;
+	int npoints = 0;
+
 	int blackPoint = EstimateBlackPoint(localBuckets);
 	if (blackPoint <= 0)
 		return {};
+
+	auto blur_pond = [this, &blackPoint](uint8_t lum) {
+		if (lum <= blackPoint) {
+			if (blackPoint == 0) return 0;
+			return 1 - (lum / blackPoint);
+		}
+		return (lum - blackPoint) / (255 - blackPoint);
+	};
 
 	// We delay reading the entire image luminance until the black point estimation succeeds.
 	// Although we end up reading four rows twice, it is consistent with our motto of
@@ -160,7 +171,16 @@ GlobalHistogramBinarizer::getBlackMatrix() const
 	auto matrix = std::make_shared<BitMatrix>(width(), height());
 	for(int y = 0; y < height(); ++y)
 		for(int x = 0; x < width(); ++x)
+		{
 			matrix->set(x, y, *_buffer.data(x, y) < blackPoint);
+			blur_score += blur_pond(*_buffer.data(x, y));
+			++npoints;
+		}
+
+	if (npoints != 0)
+	{
+		blur_score /= npoints;
+	}
 
 	return matrix;
 }

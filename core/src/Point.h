@@ -82,7 +82,7 @@ auto operator*(const PointT<T>& a, const PointT<U>& b) -> PointT<decltype(a.x * 
 template <typename T, typename U>
 PointT<T> operator*(U s, const PointT<T>& a)
 {
-	return {s * a.x, s * a.y};
+	return {T(s * a.x), T(s * a.y)};
 }
 
 template <typename T, typename U>

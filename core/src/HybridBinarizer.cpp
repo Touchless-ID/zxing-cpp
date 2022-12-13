@@ -40,14 +40,21 @@ HybridBinarizer::HybridBinarizer(const ImageView& iv) : GlobalHistogramBinarizer
 
 HybridBinarizer::~HybridBinarizer() = default;
 
+struct BlackPointData
+{
+	int blackpoint;
+	int min;
+	int max;
+};
+
 /**
 * Calculates a single black point for each block of pixels and saves it away.
 * See the following thread for a discussion of this algorithm:
 *  http://groups.google.com/group/zxing/browse_thread/thread/d06efa2c35a7ddc0
 */
-static Matrix<int> CalculateBlackPoints(const uint8_t* luminances, int subWidth, int subHeight, int width, int height, int rowStride)
+static Matrix<BlackPointData> CalculateBlackPoints(const uint8_t* luminances, int subWidth, int subHeight, int width, int height, int rowStride)
 {
-	Matrix<int>	blackPoints(subWidth, subHeight);
+	Matrix<BlackPointData>	blackPoints(subWidth, subHeight);
 
 	for (int y = 0; y < subHeight; y++) {
 		int yoffset = std::min(y * BLOCK_SIZE, height - BLOCK_SIZE);
@@ -94,13 +101,15 @@ static Matrix<int> CalculateBlackPoints(const uint8_t* luminances, int subWidth,
 
 					// The (min < bp) is arbitrary but works better than other heuristics that were tried.
 					int averageNeighborBlackPoint =
-						(blackPoints(x, y - 1) + (2 * blackPoints(x - 1, y)) + blackPoints(x - 1, y - 1)) / 4;
+						(blackPoints(x, y - 1).blackpoint + (2 * blackPoints(x - 1, y).blackpoint) + blackPoints(x - 1, y - 1).blackpoint) / 4;
 					if (min < averageNeighborBlackPoint) {
 						average = averageNeighborBlackPoint;
 					}
 				}
 			}
-			blackPoints(x, y) = average;
+			blackPoints(x, y).blackpoint = average;
+			blackPoints(x, y).min = min;
+			blackPoints(x, y).max = max;
 		}
 	}
 	return blackPoints;
@@ -110,14 +119,28 @@ static Matrix<int> CalculateBlackPoints(const uint8_t* luminances, int subWidth,
 /**
 * Applies a single threshold to a block of pixels.
 */
-static void ThresholdBlock(const uint8_t* luminances, int xoffset, int yoffset, int threshold, int rowStride, BitMatrix& matrix)
+static void ThresholdBlock(const uint8_t* luminances, int xoffset, int yoffset, int threshold, int min, int max, int rowStride, BitMatrix& matrix, float &blur_score)
 {
+	auto blur_pond = [&threshold, &min, &max](uint8_t lum) {
+		if (lum > max) return 1;
+		if (lum < min) return 1;
+		if (lum <= threshold) {
+			if (threshold <= min) return 0;
+			return (threshold - lum) / (threshold - min);
+		}
+		if (threshold >= max) return 0;
+		return (lum - threshold) / (max - threshold);
+	};
+
 #ifdef ZX_FAST_BIT_STORAGE
 	for (int y = yoffset; y < yoffset + BLOCK_SIZE; ++y) {
 		auto* src = luminances + y * rowStride + xoffset;
 		auto* const dstBegin = matrix.row(y).begin() + xoffset;
 		for (auto* dst = dstBegin; dst < dstBegin + BLOCK_SIZE; ++dst, ++src)
+		{
 			*dst = *src <= threshold;
+			blur_score += blur_pond(*src);
+		}
 	}
 #else
 	for (int y = 0, offset = yoffset * rowStride + xoffset; y < BLOCK_SIZE; y++, offset += rowStride) {
@@ -126,6 +149,7 @@ static void ThresholdBlock(const uint8_t* luminances, int xoffset, int yoffset, 
 			if (luminances[offset + x] <= threshold) {
 				matrix.set(xoffset + x, yoffset + y);
 			}
+			blur_score += blur_pond(luminances[offset + x]);
 		}
 	}
 #endif
@@ -137,9 +161,12 @@ static void ThresholdBlock(const uint8_t* luminances, int xoffset, int yoffset, 
 * on the last pixels in the row/column which are also used in the previous block).
 */
 static std::shared_ptr<BitMatrix> CalculateMatrix(const uint8_t* luminances, int subWidth, int subHeight, int width,
-												  int height, int rowStride, const Matrix<int>& blackPoints)
+												  int height, int rowStride, const Matrix<BlackPointData>& blackPoints, float &blur_score)
 {
 	auto matrix = std::make_shared<BitMatrix>(width, height);
+
+    blur_score = 0;
+	int npoints = 0;
 
 	for (int y = 0; y < subHeight; y++) {
 		int yoffset = std::min(y * BLOCK_SIZE, height - BLOCK_SIZE);
@@ -150,18 +177,24 @@ static std::shared_ptr<BitMatrix> CalculateMatrix(const uint8_t* luminances, int
 			int sum = 0;
 			for (int dy = -2; dy <= 2; ++dy) {
 				for (int dx = -2; dx <= 2; ++dx) {
-					sum += blackPoints(left + dx, top + dy);
+					sum += blackPoints(left + dx, top + dy).blackpoint;
 				}
 			}
 			int average = sum / 25;
-			ThresholdBlock(luminances, xoffset, yoffset, average, rowStride, *matrix);
+			ThresholdBlock(luminances, xoffset, yoffset, average, blackPoints(x, y).min, blackPoints(x, y).max, rowStride, *matrix, blur_score);
+			npoints += BLOCK_SIZE * BLOCK_SIZE;
 		}
+	}
+
+	if (npoints != 0)
+	{
+		blur_score /= npoints;
 	}
 
 	return matrix;
 }
 
-std::shared_ptr<const BitMatrix> HybridBinarizer::getBlackMatrix() const
+std::shared_ptr<const BitMatrix> HybridBinarizer::getBlackMatrix(float &blur_score) const
 {
 	if (width() >= MINIMUM_DIMENSION && height() >= MINIMUM_DIMENSION) {
 		const uint8_t* luminances = _buffer.data(0, 0);
@@ -170,10 +203,10 @@ std::shared_ptr<const BitMatrix> HybridBinarizer::getBlackMatrix() const
 		auto blackPoints =
 			CalculateBlackPoints(luminances, subWidth, subHeight, width(), height(), _buffer.rowStride());
 
-		return CalculateMatrix(luminances, subWidth, subHeight, width(), height(), _buffer.rowStride(), blackPoints);
+		return CalculateMatrix(luminances, subWidth, subHeight, width(), height(), _buffer.rowStride(), blackPoints, blur_score);
 	} else {
 		// If the image is too small, fall back to the global histogram approach.
-		return GlobalHistogramBinarizer::getBlackMatrix();
+		return GlobalHistogramBinarizer::getBlackMatrix(blur_score);
 	}
 }
 

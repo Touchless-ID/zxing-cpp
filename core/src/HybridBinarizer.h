@@ -43,7 +43,7 @@ public:
 	explicit HybridBinarizer(const ImageView& iv);
 	~HybridBinarizer() override;
 
-	std::shared_ptr<const BitMatrix> getBlackMatrix() const override;
+	std::shared_ptr<const BitMatrix> getBlackMatrix(float &blur_score) const override;
 };
 
 } // ZXing

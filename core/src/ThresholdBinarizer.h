@@ -59,19 +59,35 @@ public:
 		return true;
 	}
 
-	std::shared_ptr<const BitMatrix> getBlackMatrix() const override
+	std::shared_ptr<const BitMatrix> getBlackMatrix(float &blur_score) const override
 	{
 		BitMatrix res(width(), height());
+		blur_score = 0;
+		int npoints = 0;
+		auto blur_pond = [this](uint8_t lum) {
+			if (lum <= _threshold) {
+				if (_threshold == 0) return 0;
+				return 1 - (lum / _threshold);
+			}
+			return (lum - _threshold) / (255 - _threshold);
+		};
+
 #ifdef ZX_FAST_BIT_STORAGE
 		if (_buffer.pixStride() == 1 && _buffer.rowStride() == _buffer.width()) {
 			// Specialize for a packed buffer with pixStride 1 to support auto vectorization (16x speedup on AVX2)
 			auto dst = res.row(0).begin();
 			for (auto src = _buffer.data(0, 0), end = _buffer.data(0, height()); src != end; ++src, ++dst)
+			{
 				*dst = *src <= _threshold;
+				blur_score += blur_pond(*src);
+				++npoints;
+			}
 		} else {
-			auto processLine = [this, &res](int y, const auto* src, const int stride) {
+			auto processLine = [this, &res, &blur_score, &blur_pond, &npoints](int y, const auto* src, const int stride) {
 				for (auto& dst : res.row(y)) {
 					dst = *src <= _threshold;
+					blur_score += blur_pond(*src);
+					++npoints;
 					src += stride;
 				}
 			};
@@ -89,8 +105,16 @@ public:
 		const int channel = GreenIndex(_buffer.format());
 		for (int y = 0; y < res.height(); ++y)
 			for (int x = 0; x < res.width(); ++x)
+			{
 				res.set(x, y, _buffer.data(x, y)[channel] <= _threshold);
+				blur_score += blur_pond(_buffer.data(x, y)[channel]);
+				++npoints;
+			}
 #endif
+		if (npoints != 0)
+		{
+			blur_score /= npoints;
+		}
 		return std::make_shared<const BitMatrix>(std::move(res));
 	}
 };

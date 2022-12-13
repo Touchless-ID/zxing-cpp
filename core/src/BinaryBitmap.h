@@ -46,7 +46,7 @@ protected:
 	*
 	* @return The 2D array of bits for the image, nullptr on error.
 	*/
-	virtual std::shared_ptr<const BitMatrix> getBlackMatrix() const = 0;
+	virtual std::shared_ptr<const BitMatrix> getBlackMatrix(float &blur_score) const = 0;
 
 public:
 	BinaryBitmap(const ImageView& buffer);
@@ -61,6 +61,8 @@ public:
 	virtual bool getPatternRow(int row, int rotation, PatternRow& res) const = 0;
 
 	const BitMatrix* getBitMatrix() const;
+	float getBlurScore() const;
+
 };
 
 } // ZXing
