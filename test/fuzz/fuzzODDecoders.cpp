@@ -1,3 +1,8 @@
+/*
+ * Copyright 2021 Axel Waggershauser
+ */
+// SPDX-License-Identifier: Apache-2.0
+
 #include <stdint.h>
 #include <stddef.h>
 
@@ -9,6 +14,7 @@
 #include "oned/ODDataBarExpandedReader.h"
 #include "oned/ODITFReader.h"
 #include "oned/ODCodabarReader.h"
+#include "DecodeHints.h"
 #include "Result.h"
 
 using namespace ZXing;
@@ -21,7 +27,7 @@ bool init()
 	DecodeHints hints;
 	readers.emplace_back(new MultiUPCEANReader(hints));
 	readers.emplace_back(new Code39Reader(hints));
-	readers.emplace_back(new Code93Reader());
+	readers.emplace_back(new Code93Reader(hints));
 	readers.emplace_back(new Code128Reader(hints));
 	readers.emplace_back(new ITFReader(hints));
 	readers.emplace_back(new CodabarReader(hints));

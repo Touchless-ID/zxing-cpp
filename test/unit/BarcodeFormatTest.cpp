@@ -1,18 +1,7 @@
 /*
 * Copyright 2020 Axel Waggershauser
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*      http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
 */
+// SPDX-License-Identifier: Apache-2.0
 
 #include "BarcodeFormat.h"
 
@@ -24,9 +13,11 @@ using namespace ZXing;
 
 TEST(BarcodeFormatTest, BarcodeFormat)
 {
-	EXPECT_EQ(ToString(BarcodeFormat::QRCode), std::string("QRCode"));
-	EXPECT_EQ(ToString(BarcodeFormat::None), std::string("None"));
-	EXPECT_EQ(ToString(BarcodeFormat::DataMatrix | BarcodeFormat::EAN13), std::string("DataMatrix|EAN-13"));
+	using namespace std::literals;
+
+	EXPECT_EQ(ToString(BarcodeFormat::QRCode), "QRCode"s);
+	EXPECT_EQ(ToString(BarcodeFormat::None), "None"s);
+	EXPECT_EQ(ToString(BarcodeFormat::DataMatrix | BarcodeFormat::EAN13), "DataMatrix|EAN-13");
 
 	EXPECT_EQ(BarcodeFormat::EAN8, BarcodeFormatFromString("EAN_8"));
 	EXPECT_EQ(BarcodeFormat::EAN8, BarcodeFormatFromString("EAN-8"));

@@ -13,11 +13,18 @@ add_executable (UnitTest
     PseudoRandom.h
     BitHacksTest.cpp
     CharacterSetECITest.cpp
+    ContentTest.cpp
+    ErrorTest.cpp
     GTINTest.cpp
+    GS1Test.cpp
+    PatternTest.cpp
     ReedSolomonTest.cpp
+    SanitizerSupport.cpp
     TextDecoderTest.cpp
+    TextEncoderTest.cpp
     TextUtfEncodingTest.cpp
     ThresholdBinarizerTest.cpp
+    ZXAlgorithmsTest.cpp
     aztec/AZDetectorTest.cpp
     aztec/AZDecoderTest.cpp
     aztec/AZEncoderTest.cpp
@@ -38,13 +45,15 @@ add_executable (UnitTest
     oned/ODCode93WriterTest.cpp
     oned/ODCode128ReaderTest.cpp
     oned/ODCode128WriterTest.cpp
+    oned/ODDataBarReaderTest.cpp
+    oned/ODDataBarExpandedBitDecoderTest.cpp
     oned/ODEAN8WriterTest.cpp
     oned/ODEAN13WriterTest.cpp
     oned/ODITFWriterTest.cpp
     oned/ODUPCAWriterTest.cpp
     oned/ODUPCEWriterTest.cpp
-    oned/rss/ODRSSExpandedBinaryDecoderTest.cpp
-    oned/rss/ODRSSFieldParserTest.cpp
+    qrcode/MQRDecoderTest.cpp
+    qrcode/QRBitMatrixParserTest.cpp
     qrcode/QRDataMaskTest.cpp
     qrcode/QRDecodedBitStreamParserTest.cpp
     qrcode/QREncoderTest.cpp
@@ -56,6 +65,7 @@ add_executable (UnitTest
     pdf417/PDF417DecoderTest.cpp
     pdf417/PDF417ErrorCorrectionTest.cpp
     pdf417/PDF417HighLevelEncoderTest.cpp
+    pdf417/PDF417ScanningDecoderTest.cpp
     pdf417/PDF417WriterTest.cpp
 )
 

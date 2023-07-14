@@ -1,18 +1,7 @@
 /*
 * Copyright 2022 gitlost
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*      http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
 */
+// SPDX-License-Identifier: Apache-2.0
 
 #include "ThresholdBinarizer.h"
 #include "oned/ODReader.h"
@@ -24,7 +13,7 @@ using namespace ZXing;
 // Helper to parse a 0/1 string into a BitMatrix
 static BitMatrix ParseBitMatrix(const std::string& str, const int width)
 {
-	const int height = static_cast<int>(str.length() / width);
+	const int height = narrow_cast<int>(str.length() / width);
 
 	BitMatrix mat(width, height);
 	for (int y = 0; y < height; ++y) {
@@ -57,7 +46,6 @@ TEST(ThresholdBinarizerTest, PatternRowClear)
 	BitMatrix bits;
 	DecodeHints hints;
 	std::vector<uint8_t> buf;
-	Result result(DecodeStatus::NotFound);
 
 	// Test that ThresholdBinarizer::getPatternRow() clears row first (same as GlobalHistogramBinarizer)
 	// Following was failing due to OneD::DoDecode() accumulating bars in loop when using ThresholdBinarizer
@@ -107,9 +95,10 @@ TEST(ThresholdBinarizerTest, PatternRowClear)
 
 	bits = ParseBitMatrix(bitstream, 53 /*width*/);
 	hints.setFormats(BarcodeFormat::DataBarExpanded);
+	hints.setMinLineCount(1);
 	OneD::Reader reader(hints);
 
-	result = reader.decode(ThresholdBinarizer(getImageView(buf, bits), 0x7F));
+	Result result = reader.decode(ThresholdBinarizer(getImageView(buf, bits), 0x7F));
 	EXPECT_TRUE(result.isValid());
-	EXPECT_EQ(result.text(), L"(91)12345678901234567890123456789012345678901234567890123456789012345678");
+	EXPECT_EQ(result.text(TextMode::HRI), "(91)12345678901234567890123456789012345678901234567890123456789012345678");
 }

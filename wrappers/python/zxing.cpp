@@ -1,16 +1,24 @@
+/*
+ * Copyright 2019 Tim Rae
+ * Copyright 2021 Antoine Humbert
+ * Copyright 2021 Axel Waggershauser
+ */
+// SPDX-License-Identifier: Apache-2.0
+
 #include "BarcodeFormat.h"
 
 // Reader
 #include "ReadBarcode.h"
+#include "ZXAlgorithms.h"
 
 // Writer
 #include "BitMatrix.h"
 #include "MultiFormatWriter.h"
-#include "TextUtfEncoding.h"
 
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <optional>
 #include <memory>
 #include <vector>
 
@@ -20,12 +28,6 @@ namespace py = pybind11;
 // Numpy array wrapper class for images (either BGR or GRAYSCALE)
 using Image = py::array_t<uint8_t, py::array::c_style>;
 
-template<typename OUT, typename IN>
-OUT narrow(IN in)
-{
-	return static_cast<OUT>(in);
-}
-
 std::ostream& operator<<(std::ostream& os, const Position& points) {
 	for (const auto& p : points)
 		os << p.x << "x" << p.y << " ";
@@ -34,83 +36,86 @@ std::ostream& operator<<(std::ostream& os, const Position& points) {
 	return os;
 }
 
-template <typename FUNC>
-auto read_barcode_impl(FUNC func, py::object _image, const BarcodeFormats& formats, bool try_rotate, bool try_downscale,
-					   Binarizer binarizer, bool is_pure, EanAddOnSymbol ean_add_on_symbol,
-					   uint8_t max_number_of_symbols = 0xff)
+auto read_barcodes_impl(py::object _image, const BarcodeFormats& formats, bool try_rotate, bool try_downscale, TextMode text_mode,
+						Binarizer binarizer, bool is_pure, EanAddOnSymbol ean_add_on_symbol, uint8_t max_number_of_symbols = 0xff)
 {
 	const auto hints = DecodeHints()
 		.setFormats(formats)
 		.setTryRotate(try_rotate)
 		.setTryDownscale(try_downscale)
+		.setTextMode(text_mode)
 		.setBinarizer(binarizer)
 		.setIsPure(is_pure)
 		.setMaxNumberOfSymbols(max_number_of_symbols)
 		.setEanAddOnSymbol(ean_add_on_symbol);
 	const auto _type = std::string(py::str(py::type::of(_image)));
 	Image image;
+	ImageFormat imgfmt = ImageFormat::None;
 	try {
-		image = _image.cast<Image>();
-	}
-	catch(...) {
-		throw py::type_error("Unsupported type " + _type + ". Expect a PIL Image or numpy array");
-	}
-	const auto height = narrow<int>(image.shape(0));
-	const auto width = narrow<int>(image.shape(1));
-	auto channels = image.ndim() == 2 ? 1 : narrow<int>(image.shape(2));
-	ImageFormat imgfmt;
-	if (_type.find("PIL.") != std::string::npos) {
-		const auto mode = _image.attr("mode").cast<std::string>();
-		if (mode == "L")
-			imgfmt = ImageFormat::Lum;
-		else if (mode == "RGB")
-			imgfmt = ImageFormat::RGB;
-		else if (mode == "RGBA")
-			imgfmt = ImageFormat::RGBX;
-		else {
-			// Unsupported mode in ImageFormat. Let's do conversion to L mode with PIL
-			image = _image.attr("convert")("L").cast<Image>();
-			imgfmt = ImageFormat::Lum;
-			channels = 1;
+		if (_type.find("PIL.") != std::string::npos) {
+			_image.attr("load")();
+			const auto mode = _image.attr("mode").cast<std::string>();
+			if (mode == "L")
+				imgfmt = ImageFormat::Lum;
+			else if (mode == "RGB")
+				imgfmt = ImageFormat::RGB;
+			else if (mode == "RGBA")
+				imgfmt = ImageFormat::RGBX;
+			else {
+				// Unsupported mode in ImageFormat. Let's do conversion to L mode with PIL.
+				_image = _image.attr("convert")("L");
+				imgfmt = ImageFormat::Lum;
+			}
 		}
-	} else {
+		image = _image.cast<Image>();
+#if PYBIND11_VERSION_HEX > 0x02080000 // py::raise_from is available starting from 2.8.0
+	} catch (py::error_already_set &e) {
+		py::raise_from(e, PyExc_TypeError, ("Could not convert " + _type + " to numpy array of dtype 'uint8'.").c_str());
+		throw py::error_already_set();
+#endif
+	} catch (...) {
+		throw py::type_error("Could not convert " + _type + " to numpy array. Expecting a PIL Image or numpy array.");
+	}
+	const auto height = narrow_cast<int>(image.shape(0));
+	const auto width = narrow_cast<int>(image.shape(1));
+	const auto channels = image.ndim() == 2 ? 1 : narrow_cast<int>(image.shape(2));
+	if (imgfmt == ImageFormat::None) {
 		// Assume grayscale or BGR image depending on channels number
 		if (channels == 1)
 			imgfmt = ImageFormat::Lum;
 		else if (channels == 3)
 			imgfmt = ImageFormat::BGR;
 		else
-			throw py::type_error("Unsupported number of channels for numpy array: " + std::to_string(channels));
+			throw py::value_error("Unsupported number of channels for numpy array: " + std::to_string(channels));
 	}
 
 	const auto bytes = image.data();
-	return func({bytes, width, height, imgfmt, width * channels, channels}, hints);
+	return ReadBarcodes({bytes, width, height, imgfmt, width * channels, channels}, hints);
 }
 
-Result read_barcode(py::object _image, const BarcodeFormats& formats, bool try_rotate, bool try_downscale,
-					Binarizer binarizer, bool is_pure, EanAddOnSymbol ean_add_on_symbol)
+std::optional<Result> read_barcode(py::object _image, const BarcodeFormats& formats, bool try_rotate, bool try_downscale,
+								   TextMode text_mode, Binarizer binarizer, bool is_pure, EanAddOnSymbol ean_add_on_symbol)
 {
-	return read_barcode_impl(ReadBarcode, _image, formats, try_rotate, try_downscale, binarizer, is_pure,
-							 ean_add_on_symbol, 1);
+	auto res = read_barcodes_impl(_image, formats, try_rotate, try_downscale, text_mode, binarizer, is_pure, ean_add_on_symbol, 1);
+	return res.empty() ? std::nullopt : std::optional(res.front());
 }
 
 Results read_barcodes(py::object _image, const BarcodeFormats& formats, bool try_rotate, bool try_downscale,
-					  Binarizer binarizer, bool is_pure, EanAddOnSymbol ean_add_on_symbol)
+					  TextMode text_mode, Binarizer binarizer, bool is_pure, EanAddOnSymbol ean_add_on_symbol)
 {
-	return read_barcode_impl(ReadBarcodes, _image, formats, try_rotate, try_downscale, binarizer, is_pure,
-							 ean_add_on_symbol);
+	return read_barcodes_impl(_image, formats, try_rotate, try_downscale, text_mode, binarizer, is_pure, ean_add_on_symbol);
 }
 
 Image write_barcode(BarcodeFormat format, std::string text, int width, int height, int quiet_zone, int ec_level)
 {
-	auto writer = MultiFormatWriter(format).setMargin(quiet_zone).setEccLevel(ec_level);
-	auto bitmap = writer.encode(TextUtfEncoding::FromUtf8(text), width, height);
+	auto writer = MultiFormatWriter(format).setEncoding(CharacterSet::UTF8).setMargin(quiet_zone).setEccLevel(ec_level);
+	auto bitmap = writer.encode(text, width, height);
 
 	auto result = Image({bitmap.height(), bitmap.width()});
 	auto r = result.mutable_unchecked<2>();
 	for (py::ssize_t y = 0; y < r.shape(0); y++)
 		for (py::ssize_t x = 0; x < r.shape(1); x++)
-			r(y, x) = bitmap.get(narrow<int>(x), narrow<int>(y)) ? 0 : 255;
+			r(y, x) = bitmap.get(narrow_cast<int>(x), narrow_cast<int>(y)) ? 0 : 255;
 	return result;
 }
 
@@ -120,7 +125,7 @@ PYBIND11_MODULE(zxingcpp, m)
 	m.doc() = "python bindings for zxing-cpp";
 
 	// forward declaration of BarcodeFormats to fix BarcodeFormat function header typings
-	// see https://github.com/nu-book/zxing-cpp/pull/271
+	// see https://github.com/zxing-cpp/zxing-cpp/pull/271
 	py::class_<BarcodeFormats> pyBarcodeFormats(m, "BarcodeFormats");
 
 	py::enum_<BarcodeFormat>(m, "BarcodeFormat", py::arithmetic{}, "Enumeration of zxing supported barcode formats")
@@ -136,20 +141,21 @@ PYBIND11_MODULE(zxingcpp, m)
 		.value("MaxiCode", BarcodeFormat::MaxiCode)
 		.value("PDF417", BarcodeFormat::PDF417)
 		.value("QRCode", BarcodeFormat::QRCode)
+		.value("MicroQRCode", BarcodeFormat::MicroQRCode)
 		.value("DataBar", BarcodeFormat::DataBar)
 		.value("DataBarExpanded", BarcodeFormat::DataBarExpanded)
 		.value("UPCA", BarcodeFormat::UPCA)
 		.value("UPCE", BarcodeFormat::UPCE)
 		// use upper case 'NONE' because 'None' is a reserved identifier in python
 		.value("NONE", BarcodeFormat::None)
-		.value("OneDCodes", BarcodeFormat::OneDCodes)
-		.value("TwoDCodes", BarcodeFormat::TwoDCodes)
+		.value("LinearCodes", BarcodeFormat::LinearCodes)
+		.value("MatrixCodes", BarcodeFormat::MatrixCodes)
 		.export_values()
 		// see https://github.com/pybind/pybind11/issues/2221
 		.def("__or__", [](BarcodeFormat f1, BarcodeFormat f2){ return f1 | f2; });
 	pyBarcodeFormats
-		.def("__repr__", py::overload_cast<BarcodeFormats>(&ToString))
-		.def("__str__", py::overload_cast<BarcodeFormats>(&ToString))
+		.def("__repr__", py::overload_cast<BarcodeFormats>(static_cast<std::string(*)(BarcodeFormats)>(ToString)))
+		.def("__str__", py::overload_cast<BarcodeFormats>(static_cast<std::string(*)(BarcodeFormats)>(ToString)))
 		.def("__eq__", [](BarcodeFormats f1, BarcodeFormats f2){ return f1 == f2; })
 		.def("__or__", [](BarcodeFormats fs, BarcodeFormat f){ return fs | f; })
 		.def(py::init<BarcodeFormat>());
@@ -161,9 +167,24 @@ PYBIND11_MODULE(zxingcpp, m)
 		.value("LocalAverage", Binarizer::LocalAverage)
 		.export_values();
 	py::enum_<EanAddOnSymbol>(m, "EanAddOnSymbol", "Enumeration of options for EAN-2/5 add-on symbols check")
-		.value("Ignore", EanAddOnSymbol::Ignore)
-		.value("Read", EanAddOnSymbol::Read)
-		.value("Require", EanAddOnSymbol::Require)
+		.value("Ignore", EanAddOnSymbol::Ignore, "Ignore any Add-On symbol during read/scan")
+		.value("Read", EanAddOnSymbol::Read, "Read EAN-2/EAN-5 Add-On symbol if found")
+		.value("Require", EanAddOnSymbol::Require, "Require EAN-2/EAN-5 Add-On symbol to be present")
+		.export_values();
+	py::enum_<ContentType>(m, "ContentType", "Enumeration of content types")
+		.value("Text", ContentType::Text)
+		.value("Binary", ContentType::Binary)
+		.value("Mixed", ContentType::Mixed)
+		.value("GS1", ContentType::GS1)
+		.value("ISO15434", ContentType::ISO15434)
+		.value("UnknownECI", ContentType::UnknownECI)
+		.export_values();
+	py::enum_<TextMode>(m, "TextMode", "")
+		.value("Plain", TextMode::Plain, "bytes() transcoded to unicode based on ECI info or guessed charset (the default mode prior to 2.0)")
+		.value("ECI", TextMode::ECI, "standard content following the ECI protocol with every character set ECI segment transcoded to unicode")
+		.value("HRI", TextMode::HRI, "Human Readable Interpretation (dependent on the ContentType)")
+		.value("Hex", TextMode::Hex, "bytes() transcoded to ASCII string of HEX values")
+		.value("Escaped", TextMode::Escaped, "Use the EscapeNonGraphical() function (e.g. ASCII 29 will be transcoded to '<GS>'")
 		.export_values();
 	py::class_<PointI>(m, "Point", "Represents the coordinates of a point in an image")
 		.def_readonly("x", &PointI::x,
@@ -194,15 +215,21 @@ PYBIND11_MODULE(zxingcpp, m)
 		.def_property_readonly("valid", &Result::isValid,
 			":return: whether or not result is valid (i.e. a symbol was found)\n"
 			":rtype: bool")
-		.def_property_readonly("text", &Result::text,
-			":return: text of the decoded symbol\n"
+		.def_property_readonly("text", [](const Result& res) { return res.text(); },
+			":return: text of the decoded symbol (see also TextMode parameter)\n"
 			":rtype: str")
+		.def_property_readonly("bytes", [](const Result& res) { return py::bytes(res.bytes().asString()); },
+			":return: uninterpreted bytes of the decoded symbol\n"
+			":rtype: bytes")
 		.def_property_readonly("format", &Result::format,
 			":return: decoded symbol format\n"
 			":rtype: zxing.BarcodeFormat")
 		.def_property_readonly("symbology_identifier", &Result::symbologyIdentifier,
 			":return: decoded symbology idendifier\n"
 			":rtype: str")
+		.def_property_readonly("content_type", &Result::contentType,
+			":return: content type of symbol\n"
+			":rtype: zxing.ContentType")
 		.def_property_readonly("position", &Result::position,
 			":return: position of the decoded symbol\n"
 			":rtype: zxing.Position")
@@ -228,6 +255,7 @@ PYBIND11_MODULE(zxingcpp, m)
 		py::arg("formats") = BarcodeFormats{},
 		py::arg("try_rotate") = true,
 		py::arg("try_downscale") = true,
+		py::arg("text_mode") = TextMode::HRI,
 		py::arg("binarizer") = Binarizer::LocalAverage,
 		py::arg("is_pure") = false,
 		py::arg("ean_add_on_symbol") = EanAddOnSymbol::Ignore,
@@ -244,6 +272,9 @@ PYBIND11_MODULE(zxingcpp, m)
 		":type try_downscale: bool\n"
 		":param try_downscale: if ``True`` (the default), decoder also scans downscaled versions of the input; \n"
 		"  if ``False``, it will only search in the resolution provided.\n"
+		":type text_mode: zxing.TextMode\n"
+		":param text_mode: specifies the TextMode that governs how the raw bytes content is transcoded to text in the Result.\n"
+		"  Defaults to :py:attr:`zxing.TextMode.HRI`."
 		":type binarizer: zxing.Binarizer\n"
 		":param binarizer: the binarizer used to convert image before decoding barcodes.\n"
 		"  Defaults to :py:attr:`zxing.Binarizer.LocalAverage`."
@@ -254,13 +285,14 @@ PYBIND11_MODULE(zxingcpp, m)
 		":param ean_add_on_symbol: Specify whether to Ignore, Read or Require EAN-2/5 add-on symbols while scanning \n"
 		"  EAN/UPC codes. Default is ``Ignore``.\n"
 		":rtype: zxing.Result\n"
-		":return: a zxing result containing decoded symbol if found."
+		":return: a zxing result containing decoded symbol if found, None otherwise"
 	);
 	m.def("read_barcodes", &read_barcodes,
 		py::arg("image"),
 		py::arg("formats") = BarcodeFormats{},
 		py::arg("try_rotate") = true,
 		py::arg("try_downscale") = true,
+		py::arg("text_mode") = TextMode::HRI,
 		py::arg("binarizer") = Binarizer::LocalAverage,
 		py::arg("is_pure") = false,
 		py::arg("ean_add_on_symbol") = EanAddOnSymbol::Ignore,
@@ -277,6 +309,9 @@ PYBIND11_MODULE(zxingcpp, m)
 		":type try_downscale: bool\n"
 		":param try_downscale: if ``True`` (the default), decoder also scans downscaled versions of the input; \n"
 		"  if ``False``, it will only search in the resolution provided.\n"
+		":type text_mode: zxing.TextMode\n"
+		":param text_mode: specifies the TextMode that governs how the raw bytes content is transcoded to text in the Result.\n"
+		"  Defaults to :py:attr:`zxing.TextMode.HRI`."
 		":type binarizer: zxing.Binarizer\n"
 		":param binarizer: the binarizer used to convert image before decoding barcodes.\n"
 		"  Defaults to :py:attr:`zxing.Binarizer.LocalAverage`."

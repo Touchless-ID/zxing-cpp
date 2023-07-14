@@ -1,22 +1,11 @@
 /*
 * Copyright 2017 Huy Cuong Nguyen
 * Copyright 2012 ZXing authors
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*      http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
 */
+// SPDX-License-Identifier: Apache-2.0
 
 #include "PseudoRandom.h"
-#include "ZXContainerAlgorithms.h"
+#include "ZXAlgorithms.h"
 
 #include "gtest/gtest.h"
 
@@ -79,28 +68,28 @@ static void Corrupt(std::vector<int>& received, int howMany, PseudoRandom& rando
 TEST(PDF417ErrorCorrectionTest, NoError)
 {
 	std::vector<int> received(PDF417_TEST_WITH_EC, PDF417_TEST_WITH_EC + Size(PDF417_TEST_WITH_EC));
-    // no errors
+	// no errors
 	CheckDecode(received);
 }
 
 TEST(PDF417ErrorCorrectionTest, OneError)
 {
 	PseudoRandom random(0x12345678);
-    for (int i = 0; i < Size(PDF417_TEST_WITH_EC); i++) {
+	for (int i = 0; i < Size(PDF417_TEST_WITH_EC); i++) {
 		std::vector<int> received(PDF417_TEST_WITH_EC, PDF417_TEST_WITH_EC + Size(PDF417_TEST_WITH_EC));
 		received[i] = random.next(0, 255);
 		CheckDecode(received);
-    }
+	}
 }
 
 TEST(PDF417ErrorCorrectionTest, MaxErrors)
 {
 	PseudoRandom random(0x12345678);
-    for (int testIterations = 0; testIterations < 100; testIterations++) { // # iterations is kind of arbitrary
+	for (int testIterations = 0; testIterations < 100; testIterations++) { // # iterations is kind of arbitrary
 		std::vector<int> received(PDF417_TEST_WITH_EC, PDF417_TEST_WITH_EC + Size(PDF417_TEST_WITH_EC));
 		Corrupt(received, MAX_ERRORS, random, 929);
 		CheckDecode(received);
-    }
+	}
 }
 
 TEST(PDF417ErrorCorrectionTest, TooManyErrors)

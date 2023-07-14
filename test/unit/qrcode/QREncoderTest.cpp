@@ -1,24 +1,14 @@
 /*
  * Copyright 2008 ZXing authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+*/
+// SPDX-License-Identifier: Apache-2.0
 
 #include "BitArray.h"
 #include "BitArrayUtility.h"
 #include "BitMatrixIO.h"
 #include "CharacterSet.h"
 #include "TextDecoder.h"
+#include "Utf.h"
 #include "qrcode/QREncoder.h"
 #include "qrcode/QRCodecMode.h"
 #include "qrcode/QREncodeResult.h"
@@ -51,9 +41,9 @@ using namespace ZXing::Utility;
 namespace {
 	std::wstring ShiftJISString(const std::vector<uint8_t>& bytes)
 	{
-		std::wstring str;
+		std::string str;
 		TextDecoder::Append(str, bytes.data(), bytes.size(), CharacterSet::Shift_JIS);
-		return str;
+		return FromUtf8(str);
 	}
 
 	std::string RemoveSpace(std::string s)
@@ -373,22 +363,22 @@ TEST(QREncoderTest, AppendLengthInfo)
 {
 	BitArray bits;
 	AppendLengthInfo(1, // 1 letter (1/1).
-					 *Version::VersionForNumber(1), CodecMode::NUMERIC, bits);
+					 *Version::FromNumber(1), CodecMode::NUMERIC, bits);
 	EXPECT_EQ(ToString(bits), RemoveSpace("........ .X")); // 10 bits.
 
 	bits = BitArray();
 	AppendLengthInfo(2, // 2 letters (2/1).
-					 *Version::VersionForNumber(10), CodecMode::ALPHANUMERIC, bits);
+					 *Version::FromNumber(10), CodecMode::ALPHANUMERIC, bits);
 	EXPECT_EQ(ToString(bits), RemoveSpace("........ .X.")); // 11 bits.
 
 	bits = BitArray();
 	AppendLengthInfo(255, // 255 letter (255/1).
-					 *Version::VersionForNumber(27), CodecMode::BYTE, bits);
+					 *Version::FromNumber(27), CodecMode::BYTE, bits);
 	EXPECT_EQ(ToString(bits), RemoveSpace("........ XXXXXXXX")); // 16 bits.
 
 	bits = BitArray();
 	AppendLengthInfo(512, // 512 letters (1024/2).
-					 *Version::VersionForNumber(40), CodecMode::KANJI, bits);
+					 *Version::FromNumber(40), CodecMode::KANJI, bits);
 	EXPECT_EQ(ToString(bits), RemoveSpace("..X..... ....")); // 12 bits.
 }
 

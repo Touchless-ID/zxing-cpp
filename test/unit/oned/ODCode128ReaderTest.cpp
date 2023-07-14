@@ -1,21 +1,11 @@
 /*
 * Copyright 2021 gitlost
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*      http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
 */
+// SPDX-License-Identifier: Apache-2.0
 
 #include "oned/ODCode128Reader.h"
 
+#include "DecodeHints.h"
 #include "Result.h"
 
 #include "gtest/gtest.h"
@@ -36,7 +26,8 @@ static Result parse(const int startPattern, PatternRow row)
 	row.insert(row.end(), { 2, 3, 3, 1, 1, 1, 2, 0 }); // Stop pattern
 
 	std::unique_ptr<Code128Reader::DecodingState> state;
-	Code128Reader reader;
+	DecodeHints hints;
+	Code128Reader reader(hints);
 	PatternView next(row);
 	return reader.decodePattern(0, next, state);
 }
@@ -48,7 +39,7 @@ TEST(ODCode128ReaderTest, SymbologyIdentifier)
 		PatternRow row({ 2, 2, 1, 2, 3, 1, 2, 2, 2, 1, 2, 2, 3, 1, 1, 2, 2, 2 });
 		auto result = parse('C', row);
 		EXPECT_EQ(result.symbologyIdentifier(), "]C0");
-		EXPECT_EQ(result.text(), L"2001");
+		EXPECT_EQ(result.text(), "2001");
 	}
 
 	{
@@ -56,7 +47,7 @@ TEST(ODCode128ReaderTest, SymbologyIdentifier)
 		PatternRow row({ 4, 1, 1, 1, 3, 1, 2, 2, 1, 2, 3, 1, 2, 2, 2, 1, 2, 2, 1, 3, 2, 1, 3, 1 });
 		auto result = parse('C', row);
 		EXPECT_EQ(result.symbologyIdentifier(), "]C1");
-		EXPECT_EQ(result.text(), L"2001");
+		EXPECT_EQ(result.text(TextMode::HRI), "(20)01");
 	}
 
 	{
@@ -64,7 +55,7 @@ TEST(ODCode128ReaderTest, SymbologyIdentifier)
 		PatternRow row({ 1, 1, 1, 3, 2, 3, 4, 1, 1, 1, 3, 1, 1, 3, 1, 1, 2, 3, 2, 1, 2, 3, 2, 1 });
 		auto result = parse('B', row);
 		EXPECT_EQ(result.symbologyIdentifier(), "]C2");
-		EXPECT_EQ(result.text(), L"AB");
+		EXPECT_EQ(result.text(), "AB");
 	}
 
 	{
@@ -72,7 +63,7 @@ TEST(ODCode128ReaderTest, SymbologyIdentifier)
 		PatternRow row({ 2, 1, 4, 1, 2, 1, 4, 1, 1, 1, 3, 1, 1, 3, 1, 1, 2, 3, 4, 2, 1, 2, 1, 1 });
 		auto result = parse('B', row);
 		EXPECT_EQ(result.symbologyIdentifier(), "]C2");
-		EXPECT_EQ(result.text(), L"zB");
+		EXPECT_EQ(result.text(), "zB");
 	}
 
 	{
@@ -80,7 +71,7 @@ TEST(ODCode128ReaderTest, SymbologyIdentifier)
 		PatternRow row({ 1, 1, 3, 1, 4, 1, 4, 1, 1, 1, 3, 1, 1, 1, 4, 1, 3, 1, 1, 1, 1, 3, 2, 3, 1, 2, 3, 1, 2, 2 });
 		auto result = parse('C', row);
 		EXPECT_EQ(result.symbologyIdentifier(), "]C2");
-		EXPECT_EQ(result.text(), L"99A");
+		EXPECT_EQ(result.text(), "99A");
 	}
 
 	{
@@ -88,7 +79,7 @@ TEST(ODCode128ReaderTest, SymbologyIdentifier)
 		PatternRow row({ 2, 1, 2, 3, 2, 1, 4, 1, 1, 1, 3, 1, 1, 3, 1, 1, 2, 3, 3, 2, 2, 2, 1, 1 });
 		auto result = parse('B', row);
 		EXPECT_EQ(result.symbologyIdentifier(), "]C0"); // Just ignoring, not giving FormatError
-		EXPECT_EQ(result.text(), L"?\u001DB");
+		EXPECT_EQ(result.text(), "?<GS>B");
 	}
 }
 
@@ -99,7 +90,7 @@ TEST(ODCode128ReaderTest, ReaderInit)
 		PatternRow row({ 1, 1, 1, 1, 4, 3, 1, 3, 1, 1, 4, 1 });
 		auto result = parse('C', row);
 		EXPECT_FALSE(result.readerInit());
-		EXPECT_EQ(result.text(), L"92");
+		EXPECT_EQ(result.text(), "92");
 	}
 
 	{
@@ -107,7 +98,7 @@ TEST(ODCode128ReaderTest, ReaderInit)
 		PatternRow row({ 1, 1, 4, 3, 1, 1, 1, 1, 3, 1, 4, 1, 1, 1, 1, 1, 4, 3, 3, 3, 1, 1, 2, 1 });
 		auto result = parse('B', row);
 		EXPECT_TRUE(result.readerInit());
-		EXPECT_EQ(result.text(), L"92");
+		EXPECT_EQ(result.text(), "92");
 	}
 
 	{
@@ -115,6 +106,6 @@ TEST(ODCode128ReaderTest, ReaderInit)
 		PatternRow row({ 3, 2, 1, 1, 2, 2, 1, 1, 4, 3, 1, 1, 2, 2, 3, 2, 1, 1, 1, 2, 1, 4, 2, 1 });
 		auto result = parse('B', row);
 		EXPECT_TRUE(result.readerInit());
-		EXPECT_EQ(result.text(), L"92");
+		EXPECT_EQ(result.text(), "92");
 	}
 }

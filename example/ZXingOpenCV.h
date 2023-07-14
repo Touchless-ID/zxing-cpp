@@ -1,22 +1,11 @@
-#pragma once
 /*
- * Copyright 2021 Axel Waggershauser
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2020 Axel Waggershauser
  */
+// SPDX-License-Identifier: Apache-2.0
+
+#pragma once
 
 #include "ReadBarcode.h"
-#include "TextUtfEncoding.h"
 
 #include <opencv2/opencv.hpp>
 
@@ -37,9 +26,9 @@ inline ZXing::ImageView ImageViewFromMat(const cv::Mat& image)
 	return {image.data, image.cols, image.rows, fmt};
 }
 
-inline ZXing::Result ReadBarcode(const cv::Mat& image, const ZXing::DecodeHints& hints = {})
+inline ZXing::Results ReadBarcodes(const cv::Mat& image, const ZXing::DecodeHints& hints = {})
 {
-	return ZXing::ReadBarcode(ImageViewFromMat(image), hints);
+	return ZXing::ReadBarcodes(ImageViewFromMat(image), hints);
 }
 
 inline void DrawResult(cv::Mat& img, ZXing::Result res)
@@ -51,6 +40,5 @@ inline void DrawResult(cv::Mat& img, ZXing::Result res)
 	int npts = contour.size();
 
 	cv::polylines(img, &pts, &npts, 1, true, CV_RGB(0, 255, 0));
-	cv::putText(img, ZXing::TextUtfEncoding::ToUtf8(res.text()), cv::Point(10, 20), cv::FONT_HERSHEY_DUPLEX, 0.5,
-				CV_RGB(0, 255, 0));
+	cv::putText(img, res.text(), zx2cv(pos[3]) + cv::Point(0, 20), cv::FONT_HERSHEY_DUPLEX, 0.5, CV_RGB(0, 255, 0));
 }

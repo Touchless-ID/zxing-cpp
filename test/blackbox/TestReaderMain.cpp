@@ -1,24 +1,13 @@
 /*
 * Copyright 2016 Nu-book Inc.
 * Copyright 2017 Axel Waggershauser
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*      http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
 */
+// SPDX-License-Identifier: Apache-2.0
 
 #include "BlackboxTestRunner.h"
 #include "ImageLoader.h"
-#include "TextUtfEncoding.h"
-#include "ZXContainerAlgorithms.h"
+#include "ReadBarcode.h"
+#include "ZXAlgorithms.h"
 #include "ZXFilesystem.h"
 
 #include <cstdlib>
@@ -55,12 +44,12 @@ int main(int argc, char** argv)
 			Result result = ReadBarcode(ImageLoader::load(argv[i]).rotated(rotation), hints);
 			std::cout << argv[i] << ": ";
 			if (result.isValid())
-				std::cout << ToString(result.format()) << ": " << TextUtfEncoding::ToUtf8(result.text()) << "\n";
+				std::cout << ToString(result.format()) << ": " << result.text() << "\n";
 			else
 				std::cout << "FAILED\n";
 			if (result.isValid() && getenv("WRITE_TEXT")) {
 				std::ofstream f(fs::path(argv[i]).replace_extension(".txt"));
-				f << TextUtfEncoding::ToUtf8(result.text());
+				f << result.text();
 			}
 		}
 		return 0;

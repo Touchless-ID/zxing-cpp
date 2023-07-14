@@ -1,25 +1,13 @@
 /*
 * Copyright 2017 Huy Cuong Nguyen
 * Copyright 2013 ZXing authors
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*      http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
 */
+// SPDX-License-Identifier: Apache-2.0
 
 #include "BitMatrix.h"
 #include "CharacterSet.h"
 #include "DecoderResult.h"
 #include "PseudoRandom.h"
-#include "TextDecoder.h"
 #include "TextEncoder.h"
 #include "aztec/AZDecoder.h"
 #include "aztec/AZDetectorResult.h"
@@ -47,7 +35,7 @@ namespace {
 	// Shorthand to call Decode()
 	static DecoderResult parse(BitMatrix&& bits, bool compact, int nbDatablocks, int nbLayers)
 	{
-		return Aztec::Decode({{std::move(bits), {}}, compact, nbDatablocks, nbLayers, false /*readerInit*/});
+		return Aztec::Decode({{std::move(bits), {}}, compact, nbDatablocks, nbLayers, false /*readerInit*/, false /*isMirrored*/});
 	}
 
 	void TestEncodeDecode(const std::string& data, bool compact, int layers) {
@@ -97,10 +85,9 @@ namespace {
 
 		EXPECT_EQ(aztec.matrix, matrix);
 
-		std::wstring expectedData = TextDecoder::ToUnicode(textBytes, CharacterSet::ISO8859_1);
 		DecoderResult res = parse(matrix.copy(), aztec.compact, aztec.codeWords, aztec.layers);
 		EXPECT_EQ(res.isValid(), true);
-		EXPECT_EQ(res.text(), expectedData);
+		EXPECT_EQ(res.content().bytes, ByteArray(textBytes));
 
 		// Check error correction by introducing up to eccPercent/2 errors
 		int ecWords = aztec.codeWords * eccPercent / 100 / 2;
@@ -117,7 +104,7 @@ namespace {
 		}
 		res = parse(std::move(matrix), aztec.compact, aztec.codeWords, aztec.layers);
 		EXPECT_EQ(res.isValid(), true);
-		EXPECT_EQ(res.text(), expectedData);
+		EXPECT_EQ(res.content().bytes, ByteArray(textBytes));
 	}
 }
 

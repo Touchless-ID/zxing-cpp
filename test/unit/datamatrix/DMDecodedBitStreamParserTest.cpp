@@ -1,19 +1,8 @@
 /*
 * Copyright 2017 Huy Cuong Nguyen
 * Copyright 2008 ZXing authors
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*      http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
 */
+// SPDX-License-Identifier: Apache-2.0
 
 #include "ByteArray.h"
 #include "DecoderResult.h"
@@ -23,7 +12,7 @@
 
 namespace ZXing::DataMatrix::DecodedBitStreamParser {
 
-DecoderResult Decode(ByteArray&& bytes, const std::string& characterSet, const bool isDMRE);
+DecoderResult Decode(ByteArray&& bytes, const bool isDMRE);
 
 }
 
@@ -32,7 +21,7 @@ using namespace ZXing;
 // Helper to call Decode()
 static DecoderResult parse(ByteArray bytes, const bool isDMRE = false)
 {
-	return DataMatrix::DecodedBitStreamParser::Decode(std::move(bytes), "", isDMRE);
+	return DataMatrix::DecodedBitStreamParser::Decode(std::move(bytes), isDMRE);
 }
 
 // Shorthand to return text
@@ -65,13 +54,13 @@ TEST(DMDecodeTest, Ascii)
 TEST(DMDecodeTest, AsciiError)
 {
 	// ASCII err on invalid code word
-	EXPECT_EQ(parse({66, 250, 68}).errorCode(), DecodeStatus::FormatError);
+	EXPECT_EQ(parse({66, 250, 68}).error(), Error::Format);
 
 	// ASCII err on invalid code word at end (currently failing)
-	EXPECT_EQ(parse({66, 67, 68, 250}).errorCode(), DecodeStatus::FormatError);
+	EXPECT_EQ(parse({66, 67, 68, 250}).error(), Error::Format);
 
 	// ASCII accept extra (illegal) unlatch at end
-	EXPECT_EQ(parse({66, 67, 68, 254}).errorCode(), DecodeStatus::NoError);
+	EXPECT_FALSE(parse({66, 67, 68, 254}).error());
 }
 
 // Most of the following examples are taken from the DMHighLevelEncodeTest.cpp tests.

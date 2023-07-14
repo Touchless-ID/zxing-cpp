@@ -30,13 +30,17 @@ class BarcodeReader {
     // Note that this has to be kept synchronized with native (C++/JNI) side.
     enum class Format {
         NONE, AZTEC, CODABAR, CODE_39, CODE_93, CODE_128, DATA_BAR, DATA_BAR_EXPANDED,
-        DATA_MATRIX, EAN_8, EAN_13, ITF, MAXICODE, PDF_417, QR_CODE, UPC_A, UPC_E,
+        DATA_MATRIX, EAN_8, EAN_13, ITF, MAXICODE, PDF_417, QR_CODE, MICRO_QR_CODE, UPC_A, UPC_E
+    }
+    enum class ContentType {
+        TEXT, BINARY, MIXED, GS1, ISO15434, UNKNOWN_ECI
     }
 
     data class Options(
         val formats: Set<Format> = setOf(),
         val tryHarder: Boolean = false,
         val tryRotate: Boolean = false,
+        val tryInvert: Boolean = false,
         val tryDownscale: Boolean = false
     )
 
@@ -50,8 +54,10 @@ class BarcodeReader {
 
     data class Result(
         val format: Format = Format.NONE,
+        val bytes: ByteArray? = null,
         val text: String? = null,
         val time: String? = null, // for development/debug purposes only
+        val contentType: ContentType = ContentType.TEXT,
         val position: Position? = null,
         val orientation: Int = 0,
         val ecLevel: String? = null,
@@ -79,6 +85,7 @@ class BarcodeReader {
                 options.formats.joinToString(),
                 options.tryHarder,
                 options.tryRotate,
+                options.tryInvert,
                 options.tryDownscale,
                 result
             )
@@ -99,7 +106,7 @@ class BarcodeReader {
         val status = with(options) {
             readBitmap(
                 bitmap, cropRect.left, cropRect.top, cropRect.width(), cropRect.height(), rotation,
-                formats.joinToString(), tryHarder, tryRotate, tryDownscale, result
+                formats.joinToString(), tryHarder, tryRotate, tryInvert, tryDownscale, result
             )
         }
         return try {
@@ -112,13 +119,13 @@ class BarcodeReader {
     // setting the format enum from inside the JNI code is a hassle -> use returned String instead
     private external fun readYBuffer(
         yBuffer: ByteBuffer, rowStride: Int, left: Int, top: Int, width: Int, height: Int, rotation: Int,
-        formats: String, tryHarder: Boolean, tryRotate: Boolean, tryDownscale: Boolean,
+        formats: String, tryHarder: Boolean, tryRotate: Boolean, tryInvert: Boolean, tryDownscale: Boolean,
         result: Result,
     ): String?
 
     private external fun readBitmap(
         bitmap: Bitmap, left: Int, top: Int, width: Int, height: Int, rotation: Int,
-        formats: String, tryHarder: Boolean, tryRotate: Boolean, tryDownscale: Boolean,
+        formats: String, tryHarder: Boolean, tryRotate: Boolean, tryInvert: Boolean, tryDownscale: Boolean,
         result: Result,
     ): String?
 
